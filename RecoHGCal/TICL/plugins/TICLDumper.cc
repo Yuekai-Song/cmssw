@@ -9,6 +9,7 @@
 #include <variant>
 
 #include <memory>  // unique_ptr
+#include <vector>
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include "FWCore/ParameterSet/interface/PluginDescription.h"
 #include "FWCore/ParameterSet/interface/allowedValues.h"
@@ -665,6 +666,7 @@ private:
   edm::ESGetToken<HGCalDDDConstants, IdealGeometryRecord> hdc_token_;
   std::unique_ptr<DetectorTools> detectorTools_;
   bool saveLCs_;
+  bool saveCP_;
   bool saveSuperclustering_;
   bool saveSuperclusteringDNNScore_;
   bool saveRecoSuperclusters_;
@@ -750,6 +752,18 @@ private:
   std::vector<float> cluster_timeErr;
   std::vector<uint32_t> cluster_number_of_hits;
   std::vector<std::vector<uint32_t>> rechits_inLC;
+  std::vector<std::vector<float>> rechits_frac_inLC;
+
+  // caloParticles
+  std::vector<uint32_t> cp_ID;
+  std::vector<float> cp_energy;
+  std::vector<std::vector<uint32_t>> rechits_inCP;
+  std::vector<std::vector<float>> rechits_frac_inCP;
+  std::vector<std::vector<short>> rechits_isBarrel_inCP;
+  std::vector<std::vector<unsigned int>> rechits_layer_inCP;
+  std::vector<float> cp_energy_sc;
+  std::vector<std::vector<uint32_t>> rechits_inCP_sc;
+  std::vector<std::vector<float>> rechits_frac_inCP_sc;
 
   // Tracks
   std::vector<unsigned int> track_id;
@@ -781,12 +795,15 @@ private:
 
   // rechits
   std::vector<uint32_t> rechit_ID;
+  std::vector<short> rechit_isBarrel;
+  std::vector<unsigned int> rechit_layer;
   std::vector<float> rechit_energy;
   std::vector<float> rechit_x;
   std::vector<float> rechit_y;
   std::vector<float> rechit_z;
   std::vector<float> rechit_time;
   std::vector<float> rechit_radius;
+  std::vector<int> rechit_thickness;
   std::vector<float> rechit_simEnergy;
   std::vector<float> rechit_simEnergyEM;
   std::vector<float> rechit_simEnergyHad;
@@ -807,6 +824,7 @@ private:
   TTree* simTICLCandidate_tree;
   TTree* rechits_tree_;
   TTree* simhits_tree_;
+  TTree* CP_tree_;
 };
 
 void TICLDumper::clearVariables() {
@@ -884,7 +902,16 @@ void TICLDumper::clearVariables() {
   cluster_timeErr.clear();
   cluster_number_of_hits.clear();
   rechits_inLC.clear();
-
+  rechits_frac_inLC.clear();
+  cp_ID.clear();
+  cp_energy.clear();
+  cp_energy_sc.clear();
+  rechits_inCP.clear();
+  rechits_frac_inCP.clear();
+  rechits_inCP_sc.clear();
+  rechits_frac_inCP_sc.clear();
+  rechits_isBarrel_inCP.clear();
+  rechits_layer_inCP.clear();
   track_id.clear();
   track_hgcal_x.clear();
   track_hgcal_y.clear();
@@ -913,6 +940,8 @@ void TICLDumper::clearVariables() {
   track_isTrackerMuon.clear();
 
   rechit_ID.clear();
+  rechit_isBarrel.clear();
+  rechit_layer.clear();
   rechit_energy.clear();
   rechit_x.clear();
   rechit_y.clear();
@@ -922,7 +951,7 @@ void TICLDumper::clearVariables() {
   rechit_simEnergy.clear();
   rechit_simEnergyEM.clear();
   rechit_simEnergyHad.clear();
-
+  rechit_thickness.clear();
   simhit_ID.clear();
   simhit_energy.clear();
   simhit_energyEM.clear();
@@ -986,6 +1015,7 @@ TICLDumper::TICLDumper(const edm::ParameterSet& ps)
       propagator_token_(
           esConsumes<Propagator, TrackingComponentsRecord, edm::Transition::BeginRun>(edm::ESInputTag("", propName_))),
       saveLCs_(ps.getParameter<bool>("saveLCs")),
+      saveCP_(ps.getParameter<bool>("saveCP")),
       saveSuperclustering_(ps.getParameter<bool>("saveSuperclustering")),
       //saveSuperclusteringDNNScore_(ps.getParameter<bool>("saveSuperclusteringDNNScore")),
       saveRecoSuperclusters_(ps.getParameter<bool>("saveRecoSuperclusters")),
@@ -1049,12 +1079,15 @@ void TICLDumper::beginJob() {
   if (saveHits_) {
     rechits_tree_ = fs->make<TTree>("rechits", "HGCAL rechits");
     rechits_tree_->Branch("ID", &rechit_ID);
+    rechits_tree_->Branch("isBarrel", &rechit_isBarrel);
+    rechits_tree_->Branch("layer", &rechit_layer);
     rechits_tree_->Branch("energy", &rechit_energy);
     rechits_tree_->Branch("position_x", &rechit_x);
     rechits_tree_->Branch("position_y", &rechit_y);
     rechits_tree_->Branch("position_z", &rechit_z);
     rechits_tree_->Branch("time", &rechit_time);
     rechits_tree_->Branch("radiusToSide", &rechit_radius);
+    rechits_tree_->Branch("thickness", &rechit_thickness);
     rechits_tree_->Branch("simEnergy", &rechit_simEnergy);
     rechits_tree_->Branch("simEnergyEM", &rechit_simEnergyEM);
     rechits_tree_->Branch("simEnergyHad", &rechit_simEnergyHad);
@@ -1087,6 +1120,21 @@ void TICLDumper::beginJob() {
     cluster_tree_->Branch("cluster_timeErr", &cluster_timeErr);
     cluster_tree_->Branch("cluster_number_of_hits", &cluster_number_of_hits);
     cluster_tree_->Branch("rechits", &rechits_inLC);
+    cluster_tree_->Branch("rechits_frac", &rechits_frac_inLC);
+  }
+  if (saveCP_) {
+    CP_tree_ = fs->make<TTree>("CP", "CP hits");
+    CP_tree_->Branch("event", &eventId_);
+    CP_tree_->Branch("ID", &cp_ID);
+    CP_tree_->Branch("energy", &cp_energy);
+    CP_tree_->Branch("energy_sc", &cp_energy_sc);
+    CP_tree_->Branch("simhits", &rechits_inCP);
+    CP_tree_->Branch("simhits_frac", &rechits_frac_inCP);
+    CP_tree_->Branch("simhits_sc", &rechits_inCP_sc);
+    CP_tree_->Branch("simhits_frac_sc", &rechits_frac_inCP_sc);
+    CP_tree_->Branch("simhits_isBarrel", &rechits_isBarrel_inCP);
+    CP_tree_->Branch("simhits_layer", &rechits_layer_inCP);
+
   }
   if (saveTICLCandidate_) {
     candidate_tree_ = fs->make<TTree>("candidates", "TICL candidates");
@@ -1305,10 +1353,12 @@ void TICLDumper::analyze(const edm::Event& event, const edm::EventSetup& setup) 
   auto simclusters_h = event.getHandle(simclusters_token_);
 
   nclusters_ = clusters.size();
+  edm::Handle<std::unordered_map<DetId, const unsigned int>> hitMap;
+  event.getByToken(hitMapToken_, hitMap);
 
   if (saveHits_) {
-    edm::Handle<std::unordered_map<DetId, const unsigned int>> hitMap;
-    event.getByToken(hitMapToken_, hitMap);
+    // edm::Handle<std::unordered_map<DetId, const unsigned int>> hitMap;
+    // event.getByToken(hitMapToken_, hitMap);
 
     struct ThreeFloat {
       ThreeFloat() : energy(0.f), energyEM(0.f), energyHad(0.f) {};
@@ -1362,7 +1412,16 @@ void TICLDumper::analyze(const edm::Event& event, const edm::EventSetup& setup) 
         rechit_z.push_back(rhPosition.z());
         rechit_ID.push_back(rh.detid());
         rechit_time.push_back(rh.time());
+        rechit_isBarrel.push_back(detectorTools_->rhtools.isBarrel(rh.detid()));
+        rechit_layer.push_back(detectorTools_->rhtools.getLayerWithOffset(rh.detid()));
         rechit_radius.push_back(detectorTools_->rhtools.getRadiusToSide(rh.detid()));
+        int thickness = detectorTools_->rhtools.getSiThickIndex(rh.detid());
+        if (thickness == -1) {
+          thickness = 6;
+        } else if (rh.detid().det() == DetId::HGCalHSi || rh.detid().subdetId() == HGCHEF) {
+          thickness += 3;
+        }
+        rechit_thickness.push_back(thickness);
         const auto hitId = hitMap->find(DetId(rh.detid()));
         if (hitId != hitMap->end()) {
           rechit_simEnergy.push_back(hitIdToEnergies[hitId->second].energy);
@@ -1479,10 +1538,55 @@ void TICLDumper::analyze(const edm::Event& event, const edm::EventSetup& setup) 
     cluster_time.push_back(layerClustersTimes.get(c_id).first);
     c_id += 1;
     std::vector<uint32_t> hits_detid;
+    std::vector<float> hits_frac;
     for (auto const& handf : cluster_iterator->hitsAndFractions()) {
       hits_detid.push_back(handf.first);
+      hits_frac.push_back(handf.second);
     }
     rechits_inLC.push_back(hits_detid);
+    rechits_frac_inLC.push_back(hits_frac);
+  }
+  auto const& caloparticles = *caloparticles_h;
+  for (auto const& cp : caloparticles) {
+    if (cp.g4Tracks()[0].eventId().event() != 0 or cp.g4Tracks()[0].eventId().bunchCrossing() != 0) {
+      continue;
+    }
+    cp_ID.push_back(cp.g4Tracks().front().trackId());
+    cp_energy.push_back(cp.energy());
+    
+    std::vector<uint32_t> hits_detid_sc;
+    std::vector<float> hits_frac_sc;
+    auto cPEnergy = 0.f;
+    for (const auto& simCluster : cp.simClusters()) {
+      for (const auto& it_haf : simCluster->hits_and_fractions()) {
+        const DetId hitid = (it_haf.first);
+        hits_detid_sc.push_back(hitid);
+        hits_frac_sc.push_back(it_haf.second);
+        auto itcheck = find(rechit_ID.begin(), rechit_ID.end(), hitid);
+        if (itcheck != rechit_ID.end()) {
+          auto hit_index = std::distance(rechit_ID.begin(), itcheck); 
+          auto hit_energy = rechit_energy[hit_index];
+          cPEnergy += it_haf.second * hit_energy;
+        }
+      }
+    }
+    cp_energy_sc.push_back(cPEnergy);
+    rechits_inCP_sc.push_back(hits_detid_sc);
+    rechits_frac_inCP_sc.push_back(hits_frac_sc);
+    std::vector<uint32_t> hits_detid;
+    std::vector<float> hits_frac;
+    std::vector<unsigned int> hits_layer;
+    std::vector<short> hits_isBarrel;
+    for (auto const& handf : cp.hits_and_fractions()) {
+      hits_detid.push_back(handf.first);
+      hits_frac.push_back(handf.second);
+      hits_layer.push_back(detectorTools_->rhtools.getLayerWithOffset(handf.first));
+      hits_isBarrel.push_back(detectorTools_->rhtools.isBarrel(handf.first));
+    }
+    rechits_inCP.push_back(hits_detid);
+    rechits_frac_inCP.push_back(hits_frac);
+    rechits_layer_inCP.push_back(hits_layer);
+    rechits_isBarrel_inCP.push_back(hits_isBarrel);
   }
 
   tracksters_in_candidate.resize(ticlcandidates.size());
@@ -1578,6 +1682,8 @@ void TICLDumper::analyze(const edm::Event& event, const edm::EventSetup& setup) 
 
   if (saveLCs_)
     cluster_tree_->Fill();
+  if (saveCP_)
+    CP_tree_->Fill();
   if (saveTICLCandidate_)
     candidate_tree_->Fill();
   if (saveSuperclustering_ || saveRecoSuperclusters_)
@@ -1665,6 +1771,7 @@ void TICLDumper::fillDescriptions(edm::ConfigurationDescriptions& descriptions) 
   desc.add<std::string>("propagator", "PropagatorWithMaterial");
 
   desc.add<bool>("saveLCs", true);
+  desc.add<bool>("saveCP", true);
   desc.add<bool>("saveTICLCandidate", true);
   desc.add<bool>("saveSimTICLCandidate", true);
   desc.add<bool>("saveTracks", true);

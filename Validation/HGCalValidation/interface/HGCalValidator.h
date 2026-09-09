@@ -6,6 +6,7 @@
  *
  *  \author HGCal
  */
+#include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
@@ -95,14 +96,18 @@ protected:
   std::vector<edm::InputTag> label_clustersmask;
   const bool doCandidatesPlots_;
   std::string label_candidates_;
+  const bool doResponsePlots_;
   const edm::FileInPath cummatbudinxo_;
 
   std::vector<edm::EDGetTokenT<reco::CaloClusterCollection>> labelToken;
   edm::EDGetTokenT<std::vector<SimCluster>> simClusters_;
   edm::EDGetTokenT<reco::CaloClusterCollection> layerclusters_;
+  edm::EDGetTokenT<reco::GenParticleCollection> genParticles_;
   std::vector<edm::EDGetTokenT<ticl::TracksterCollection>> label_tstTokens;
   edm::EDGetTokenT<ticl::TracksterCollection> simTracksters_;
   edm::EDGetTokenT<ticl::TracksterCollection> simTracksters_fromCPs_;
+  edm::EDGetTokenT<std::vector<TICLCandidate>> TICLCandidatesToken_;
+  edm::EDGetTokenT<ticl::TracksterToTracksterMap> associatorMapStRToken_;
   edm::EDGetTokenT<std::map<uint, std::vector<uint>>> simTrackstersMap_;
   edm::EDGetTokenT<std::vector<CaloParticle>> label_cp_effic;
   edm::EDGetTokenT<std::vector<CaloParticle>> label_cp_fake;

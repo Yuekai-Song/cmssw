@@ -9,6 +9,7 @@
 #include <vector>
 #include <unordered_map>
 
+#include "DataFormats/HGCalReco/interface/TICLCandidate.h"
 #include "FWCore/Framework/interface/ConsumesCollector.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Framework/interface/EventSetup.h"
@@ -61,11 +62,13 @@ struct HGVHistoProducerAlgoHistograms {
   std::unordered_map<int, dqm::reco::MonitorElement*> h_score_layercl2caloparticle_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_score_caloparticle2layercl_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_energy_vs_score_caloparticle2layercl_perlayer;
+  std::unordered_map<int, dqm::reco::MonitorElement*> h_totalenergy_vs_score_caloparticle2layercl_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_energy_vs_score_layercl2caloparticle_perlayer;
+  std::unordered_map<int, dqm::reco::MonitorElement*> h_totalenergy_vs_score_layercl2caloparticle_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_sharedenergy_caloparticle2layercl_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_sharedenergy_caloparticle2layercl_vs_eta_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_sharedenergy_caloparticle2layercl_vs_phi_perlayer;
-  std::unordered_map<int, dqm::reco::MonitorElement*> h_sharedenergy_layercl2caloparticle_perlayer;
+  // std::unordered_map<int, dqm::reco::MonitorElement*> h_sharedenergy_layercl2caloparticle_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_sharedenergy_layercl2caloparticle_vs_eta_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_sharedenergy_layercl2caloparticle_vs_phi_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_num_caloparticle_eta_perlayer;
@@ -75,14 +78,56 @@ struct HGVHistoProducerAlgoHistograms {
   std::unordered_map<int, dqm::reco::MonitorElement*> h_numDup_caloparticle_phi_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_denom_caloparticle_phi_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_num_layercl_eta_perlayer;
+  std::unordered_map<int, dqm::reco::MonitorElement*> h_nums_layercl_eta_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_numMerge_layercl_eta_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_denom_layercl_eta_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_num_layercl_phi_perlayer;
+  std::unordered_map<int, dqm::reco::MonitorElement*> h_nums_layercl_phi_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_numMerge_layercl_phi_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_denom_layercl_phi_perlayer;
+  std::unordered_map<int, std::vector<dqm::reco::MonitorElement*>> h_response_reco2sim_perlayer;
+  std::unordered_map<int, std::vector<dqm::reco::MonitorElement*>> h_response_sim2reco_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_cellAssociation_perlayer;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_clusternum_perthick;
   std::unordered_map<int, dqm::reco::MonitorElement*> h_cellsenedens_perthick;
+  std::vector<dqm::reco::MonitorElement*> h_num_layercl_perlayer;
+  std::vector<dqm::reco::MonitorElement*> h_nums_layercl_perlayer;
+  std::vector<dqm::reco::MonitorElement*> h_num_caloparticle_perlayer;
+  dqm::reco::MonitorElement* h_sharedenergy_layercl2caloparticle_avg_perlayer;
+  dqm::reco::MonitorElement* h_sharedenergy_layercl2caloparticle_perlayer;
+  dqm::reco::MonitorElement* h_sharedenergy_caloenergy_layercl2caloparticle_perlayer;
+  dqm::reco::MonitorElement* h_sharedenergy_layercaloenergy_layercl2caloparticle_perlayer;
+  dqm::reco::MonitorElement* h_sharedenergy_caloenergy_layercl2caloparticle_avg_perlayer;
+  dqm::reco::MonitorElement* h_sharedenergy_layercaloenergy_layercl2caloparticle_avg_perlayer;
+
+  dqm::reco::MonitorElement* h_response_simtrackstersFromCP2caloparticle;
+  dqm::reco::MonitorElement* h_response_trackstersCLUE3DHigh2caloparticle;
+  dqm::reco::MonitorElement* h_response_ticlcandidate2caloparticle;
+  dqm::reco::MonitorElement* h_response_layerClusters2caloparticle;
+  dqm::reco::MonitorElement* h_response_layerClusters2caloparticle_mask;
+  dqm::reco::MonitorElement* h_response_shared_trackstersCLUE3DHigh2caloparticle;
+  dqm::reco::MonitorElement* h_response_shared_ticlcandidate2caloparticle;
+  dqm::reco::MonitorElement* h_response_shared_layerClusters2caloparticle;
+  dqm::reco::MonitorElement* h_response_shared_layerClusters2caloparticle_mask;
+  dqm::reco::MonitorElement* h_response_reg_ticlcandidate2caloparticle;
+  dqm::reco::MonitorElement* h_response_trackstersCLUE3DHigh2caloparticle_sci;
+  dqm::reco::MonitorElement* h_response_ticlcandidate2caloparticle_sci;
+  dqm::reco::MonitorElement* h_response_layerClusters2caloparticle_sci;
+  dqm::reco::MonitorElement* h_response_layerClusters2caloparticle_mask_sci;
+  dqm::reco::MonitorElement* h_response_shared_trackstersCLUE3DHigh2caloparticle_sci;
+  dqm::reco::MonitorElement* h_response_shared_ticlcandidate2caloparticle_sci;
+  dqm::reco::MonitorElement* h_response_shared_layerClusters2caloparticle_sci;
+  dqm::reco::MonitorElement* h_response_shared_layerClusters2caloparticle_mask_sci;
+  dqm::reco::MonitorElement* h_response_reg_ticlcandidate2caloparticle_sci;
+
+  dqm::reco::MonitorElement* h_caloparticle_energy_frac_ee;
+  dqm::reco::MonitorElement* h_caloparticle_energy_frac_bh;
+  std::vector<dqm::reco::MonitorElement*> h_response_reco2sim_all;
+  std::vector<dqm::reco::MonitorElement*> h_response_reco2sim_e;
+  std::vector<dqm::reco::MonitorElement*> h_response_reco2sim_h;
+  std::vector<dqm::reco::MonitorElement*> h_response_sim2reco_all;
+  std::vector<dqm::reco::MonitorElement*> h_response_sim2reco_e;
+  std::vector<dqm::reco::MonitorElement*> h_response_sim2reco_h;
 
   std::unordered_map<std::string, dqm::reco::MonitorElement*> h_cellsnum_perthickperlayer;
   std::unordered_map<std::string, dqm::reco::MonitorElement*> h_distancetoseedcell_perthickperlayer;
@@ -269,6 +314,8 @@ public:
 
   void bookTracksterHistos(DQMStore::IBooker& ibook, Histograms& histograms, unsigned int layers);
 
+  void bookResponseHistos(DQMStore::IBooker& ibook, Histograms& histograms);
+
   void bookTracksterSTSHistos(DQMStore::IBooker& ibook, Histograms& histograms, const validationType valType);
 
   void layerClusters_to_CaloParticles(const Histograms& histograms,
@@ -375,6 +422,23 @@ public:
                              const edm::Handle<TracksterToTracksterMap>& trackstersToSimTrackstersFromCPsByHitsMapH,
                              const edm::Handle<TracksterToTracksterMap>& simTrackstersFromCPsToTrackstersByHitsMapH,
                              const SimClusterToCaloParticleMap& scToCpMap) const;
+  void fill_response_histos(const Histograms& histograms,
+                            const edm::ProductID& cPHandle_id,
+                            std::vector<CaloParticle> const& cP,
+                            std::vector<size_t> const& cPIndices,
+                            std::vector<size_t> const& cPSelectedIndices,
+                            const ticl::TracksterCollection& tracksters,
+                            const ticl::TracksterCollection& simTracksters_fromCP,
+                            const edm::Handle<std::vector<TICLCandidate>> ticlcandidatesHandle,
+                            const SimClusterToCaloParticleMap& scToCpMap,
+                            std::unordered_map<DetId, const unsigned int> const& hitMap,
+                            unsigned int layers,
+                            edm::Handle<std::vector<CaloParticle>> caloParticleHandle,
+                            edm::MultiSpan<HGCRecHit> const& hits,
+                            const edm::Handle<reco::GenParticleCollection> genParticleHandle,
+                            const edm::Handle<TracksterToTracksterMap>& simTrackstersFromCPsToTrackstersByLCsMapH,
+                            const edm::Handle<TracksterToTracksterMap>& ticlSimTrackstersfromCPsToticlCandidateH) const;
+
   double distance2(const double x1, const double y1, const double x2, const double y2) const;
   double distance(const double x1, const double y1, const double x2, const double y2) const;
 
@@ -406,7 +470,7 @@ public:
 
 private:
   double getEta(double eta) const;
-
+  std::string to_p_string(double x) const;
   std::shared_ptr<hgcal::RecHitTools> recHitTools_;
   constexpr static int numberOfValidationTypes_ = 4;
   std::array<std::string, numberOfValidationTypes_> ref_ = {
@@ -419,6 +483,8 @@ private:
   std::array<std::string, numberOfValidationTypes_> valSuffix_ = {{"_byHits_CP", "_byLCs", "_byLCs_CP", "_byHits"}};
 
   //private data members
+  std::vector<double> VScoreCutLCtoCP_;
+  std::vector<double> VScoreCutCPtoLC_;
   double minEta_, maxEta_;
   int nintEta_;
   bool useFabsEta_;
@@ -444,6 +510,8 @@ private:
   int nintTotNClsperlay_;
   double minEneClperlay_, maxEneClperlay_;
   int nintEneClperlay_;
+  double minSingleEneClperlay_, maxSingleEneClperlay_;
+  int nintSingleEneClperlay_;
   double minScore_, maxScore_;
   int nintScore_;
   double minSharedEneFrac_, maxSharedEneFrac_;
@@ -489,6 +557,7 @@ private:
   int nintY_;
   double minZ_, maxZ_;
   int nintZ_;
+  bool response_booked_;
 };
 
 #endif

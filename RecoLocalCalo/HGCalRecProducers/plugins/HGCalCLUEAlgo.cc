@@ -13,6 +13,7 @@
 #include "DataFormats/CaloRecHit/interface/CaloID.h"
 #include "oneapi/tbb/task_arena.h"
 #include "oneapi/tbb.h"
+#include <iterator>
 #include <limits>
 #include <cmath>
 #include <utility>
@@ -273,8 +274,13 @@ void HGCalCLUEAlgoT<T, STRATEGY>::calculateLocalDensity(const T& lt,
 
         for (unsigned int j = 0; j < binSize; j++) {
           unsigned int otherId = lt[binId][j];
-          if (distance(lt, i, otherId, layerId) < delta) {
-            cellsOnLayer.rho[i] += (i == otherId ? 1.f : 0.5f) * cellsOnLayer.weight[otherId];
+          auto dist = distance(lt, i, otherId, layerId);
+          float kernel = (i == otherId ? 1.f : 0.5f);
+          if (gausKer_[1] > 0.) {
+            kernel = std::exp(-dist * dist / (2 * gausKer_[1] * gausKer_[1]));
+          }
+          if (dist < delta) {
+            cellsOnLayer.rho[i] += kernel * cellsOnLayer.weight[otherId];
           }
         }
       }
@@ -306,7 +312,12 @@ void HGCalCLUEAlgoT<T, STRATEGY>::calculateLocalDensity(const T& lt,
         size_t binSize = lt[binId].size();
         for (unsigned int j = 0; j < binSize; j++) {
           unsigned int otherId = lt[binId][j];
-          if (distance(lt, i, otherId, layerId) < delta) {
+          auto dist = distance(lt, i, otherId, layerId);
+          float kernel = (i == otherId ? 1.f : 0.5f);
+          if (gausKer_[1] > 0.) {
+            kernel = std::exp(-dist * dist / (2 * gausKer_[1] * gausKer_[1]));
+          }
+          if (dist < delta) {
             int iPhi = HGCScintillatorDetId(cellsOnLayer.detid[i]).iphi();
             int otherIPhi = HGCScintillatorDetId(cellsOnLayer.detid[otherId]).iphi();
             int iEta = HGCScintillatorDetId(cellsOnLayer.detid[i]).ieta();
@@ -322,7 +333,7 @@ void HGCalCLUEAlgoT<T, STRATEGY>::calculateLocalDensity(const T& lt,
                                       << " iEta: " << iEta << "\n";
 
             if (otherId != i) {
-              auto neighborCellContribution = 0.5f * cellsOnLayer.weight[otherId];
+              auto neighborCellContribution = kernel * cellsOnLayer.weight[otherId];
               all += neighborCellContribution;
               if (dIPhi >= 0 && dIEta >= 0)
                 northeast += neighborCellContribution;
@@ -515,6 +526,7 @@ void HGCalCLUEAlgoT<T, STRATEGY>::computeThreshold() {
                                 << " fcPerEle: " << fcPerEle_ << " fcPerMip: " << fcPerMip_[ithick]
                                 << " noiseMip: " << fcPerEle_ * nonAgedNoises_[ithick] / fcPerMip_[ithick]
                                 << " sigmaNoise: " << sigmaNoise << "\n";
+      // LogDebug("HGCalCLUEAlgo") << "ilayer: " << ilayer << "ithick: " << ithick << " threshold: " << thresholds_[ilayer - 1][ithick] << "\n";
     }
 
     if (!isNose_) {
@@ -523,6 +535,7 @@ void HGCalCLUEAlgoT<T, STRATEGY>::computeThreshold() {
       v_sigmaNoise_[ilayer - 1][maxNumberOfThickIndices_] = scintillators_sigmaNoise;
       LogDebug("HGCalCLUEAlgo") << "ilayer: " << ilayer << " noiseMip: " << noiseMip_
                                 << " scintillators_sigmaNoise: " << scintillators_sigmaNoise << "\n";
+      // LogDebug("HGCalCLUEAlgo") << "ilayer: " << ilayer << "ithick: " << maxNumberOfThickIndices_ << " threshold: " << thresholds_[ilayer - 1][maxNumberOfThickIndices_] << "\n";
     }
   }
 }

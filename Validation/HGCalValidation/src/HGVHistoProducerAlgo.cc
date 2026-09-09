@@ -1,8 +1,11 @@
+#include <iostream>
 #include <numeric>
 #include <iomanip>
 #include <sstream>
+#include <vector>
 
 #include "Validation/HGCalValidation/interface/HGVHistoProducerAlgo.h"
+#include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "SimDataFormats/CaloAnalysis/interface/SimCluster.h"
 #include "TMath.h"
@@ -21,7 +24,9 @@ const double ScoreCutTStoSTSFakeMerge_[] = {0.6, FLT_MIN};  //1.e-09
 const double ScoreCutSTStoTSPurDup_[] = {0.2, FLT_MIN};     //1.e-11
 
 HGVHistoProducerAlgo::HGVHistoProducerAlgo(const edm::ParameterSet& pset)
-    :  //parameters for eta
+    : VScoreCutLCtoCP_(pset.getParameter<std::vector<double>>("VScoreCutLCtoCP")),
+      VScoreCutCPtoLC_(pset.getParameter<std::vector<double>>("VScoreCutCPtoLC")),
+      //parameters for eta
       minEta_(pset.getParameter<double>("minEta")),
       maxEta_(pset.getParameter<double>("maxEta")),
       nintEta_(pset.getParameter<int>("nintEta")),
@@ -57,6 +62,7 @@ HGVHistoProducerAlgo::HGVHistoProducerAlgo(const edm::ParameterSet& pset)
       maxEneCl_(pset.getParameter<double>("maxEneCl")),
       nintEneCl_(pset.getParameter<int>("nintEneCl")),
 
+
       //parameters for the longitudinal depth barycenter.
       minLongDepBary_(pset.getParameter<double>("minLongDepBary")),
       maxLongDepBary_(pset.getParameter<double>("maxLongDepBary")),
@@ -81,6 +87,11 @@ HGVHistoProducerAlgo::HGVHistoProducerAlgo(const edm::ParameterSet& pset)
       minEneClperlay_(pset.getParameter<double>("minEneClperlay")),
       maxEneClperlay_(pset.getParameter<double>("maxEneClperlay")),
       nintEneClperlay_(pset.getParameter<int>("nintEneClperlay")),
+
+      //parameters for a single layercluster
+      minSingleEneClperlay_(pset.getParameter<double>("minSingleEneClperlay")),
+      maxSingleEneClperlay_(pset.getParameter<double>("maxSingleEneClperlay")),
+      nintSingleEneClperlay_(pset.getParameter<int>("nintSingleEneClperlay")),
 
       //Parameters for the score both for:
       //1. calo particle to layer clusters association per layer
@@ -198,7 +209,8 @@ HGVHistoProducerAlgo::HGVHistoProducerAlgo(const edm::ParameterSet& pset)
       //parameters for z
       minZ_(pset.getParameter<double>("minZ")),
       maxZ_(pset.getParameter<double>("maxZ")),
-      nintZ_(pset.getParameter<int>("nintZ")) {}
+      nintZ_(pset.getParameter<int>("nintZ")),
+      response_booked_(false) {}
 
 HGVHistoProducerAlgo::~HGVHistoProducerAlgo() {}
 
@@ -741,6 +753,15 @@ void HGVHistoProducerAlgo::bookClusterHistos_LCtoCP_association(DQMStore::IBooke
                      nintSharedEneFrac_,
                      minSharedEneFrac_,
                      maxSharedEneFrac_);
+    histograms.h_totalenergy_vs_score_layercl2caloparticle_perlayer[ilayer] =
+        ibook.book2D("TotalEnergy_vs_Score_layer2caloparticle_perlayer" + istr1,
+                     "Total Energy vs Score of Layer Cluster per CaloParticle Layer for layer " + istr2,
+                     nintScore_,
+                     minScore_,
+                     maxScore_,
+                     nintSingleEneClperlay_,
+                     minSingleEneClperlay_,
+                     maxSingleEneClperlay_);
     histograms.h_sharedenergy_caloparticle2layercl_perlayer[ilayer] =
         ibook.book1D("SharedEnergy_caloparticle2layercl_perlayer" + istr1,
                      "Shared Energy of CaloParticle per Layer Cluster for layer " + istr2,
@@ -763,12 +784,12 @@ void HGVHistoProducerAlgo::bookClusterHistos_LCtoCP_association(DQMStore::IBooke
                           maxPhi_,
                           minSharedEneFrac_,
                           maxSharedEneFrac_);
-    histograms.h_sharedenergy_layercl2caloparticle_perlayer[ilayer] =
-        ibook.book1D("SharedEnergy_layercluster2caloparticle_perlayer" + istr1,
-                     "Shared Energy of Layer Cluster per Layer Calo Particle for layer " + istr2,
-                     nintSharedEneFrac_,
-                     minSharedEneFrac_,
-                     maxSharedEneFrac_);
+    // histograms.h_sharedenergy_layercl2caloparticle_perlayer[ilayer] =
+    //     ibook.book1D("SharedEnergy_layercluster2caloparticle_perlayer" + istr1,
+    //                  "Shared Energy of Layer Cluster per Layer Calo Particle for layer " + istr2,
+    //                  nintSharedEneFrac_,
+    //                  minSharedEneFrac_,
+    //                  maxSharedEneFrac_);
     histograms.h_sharedenergy_layercl2caloparticle_vs_eta_perlayer[ilayer] =
         ibook.bookProfile("SharedEnergy_layercl2caloparticle_vs_eta_perlayer" + istr1,
                           "Shared Energy of LayerCluster vs #eta per best Calo Particle for layer " + istr2,
@@ -827,6 +848,12 @@ void HGVHistoProducerAlgo::bookClusterHistos_LCtoCP_association(DQMStore::IBooke
                      nintEta_,
                      minEta_,
                      maxEta_);
+    histograms.h_nums_layercl_eta_perlayer[ilayer] =
+        ibook.book1D("Nums_LayerCluster_Eta_perlayer" + istr1,
+                     "Nums LayerCluster Eta per Layer Cluster for layer " + istr2,
+                     nintEta_,
+                     minEta_,
+                     maxEta_);
     histograms.h_numMerge_layercl_eta_perlayer[ilayer] =
         ibook.book1D("NumMerge_LayerCluster_Eta_perlayer" + istr1,
                      "Num Merge LayerCluster Eta per Layer Cluster for layer " + istr2,
@@ -845,6 +872,12 @@ void HGVHistoProducerAlgo::bookClusterHistos_LCtoCP_association(DQMStore::IBooke
                      nintPhi_,
                      minPhi_,
                      maxPhi_);
+    histograms.h_nums_layercl_phi_perlayer[ilayer] =
+        ibook.book1D("Nums_LayerCluster_Phi_perlayer" + istr1,
+                     "Nums LayerCluster Phi per Layer Cluster for layer " + istr2,
+                     nintPhi_,
+                     minPhi_,
+                     maxPhi_);
     histograms.h_numMerge_layercl_phi_perlayer[ilayer] =
         ibook.book1D("NumMerge_LayerCluster_Phi_perlayer" + istr1,
                      "Num Merge LayerCluster Phi per Layer Cluster for layer " + istr2,
@@ -857,8 +890,116 @@ void HGVHistoProducerAlgo::bookClusterHistos_LCtoCP_association(DQMStore::IBooke
                      nintPhi_,
                      minPhi_,
                      maxPhi_);
+    for (auto const& score : VScoreCutCPtoLC_) {
+      std::string s = to_p_string(score);
+      histograms.h_response_sim2reco_perlayer[ilayer].push_back(
+        ibook.book1D("Response_sim2reco_perlayer" + istr1 + "_cut" + s,
+                        "Response with SimToReco for layer " + istr2 + " with cut " + s,
+                        50,
+                        0,
+                        5));
+    }
+    for (auto const& score : VScoreCutLCtoCP_) {
+      std::string s = to_p_string(score);
+      histograms.h_response_reco2sim_perlayer[ilayer].push_back(
+        ibook.book1D("Response_reco2sim_perlayer" + istr1 + "_cut" + s,
+                        "Response with RecoToSim for layer " + istr2 + " with cut " + s,
+                        50,
+                        0,
+                        5));
+    }
+  }  
+  histograms.h_sharedenergy_layercl2caloparticle_perlayer =
+    ibook.bookProfile("SharedEnergy_layercl2caloparticle_perlayer",
+                  "Shared Energy of CaloParticle per Layer Cluster averaged over all clusters per layer",
+                  2 * layers,
+                  0.,
+                  2 * layers,
+                  minSharedEneFrac_,
+                  maxSharedEneFrac_);
+  histograms.h_sharedenergy_layercl2caloparticle_avg_perlayer =
+    ibook.bookProfile("SharedEnergy_layercl2caloparticle_perlayer_avg",
+                  "Shared Energy of CaloParticle per Layer Cluster averaged over all clusters per layer",
+                  2 * layers,
+                  0.,
+                  2 * layers,
+                  minSharedEneFrac_,
+                  maxSharedEneFrac_);
+  histograms.h_sharedenergy_caloenergy_layercl2caloparticle_perlayer =
+    ibook.bookProfile2D("SharedEnergy_caloenergy_layercl2caloparticle_perlayer",
+                  "LayerCluster Purity vs CaloParticle Energy per layer",
+                  2 * layers,
+                  0.,
+                  2 * layers,
+                  nintEne_,
+                  minEne_,
+                  maxEne_,
+                  minSharedEneFrac_,
+                  maxSharedEneFrac_);
+  histograms.h_sharedenergy_caloenergy_layercl2caloparticle_avg_perlayer =
+    ibook.bookProfile2D("SharedEnergy_caloenergy_layercl2caloparticle_avg_perlayer",
+                  "LayerCluster Purity vs CaloParticle Energy per layer averaged over all clusters",
+                  2 * layers,
+                  0.,
+                  2 * layers,
+                  nintEne_,
+                  minEne_,
+                  maxEne_,
+                  minSharedEneFrac_,
+                  maxSharedEneFrac_);
+  histograms.h_sharedenergy_layercaloenergy_layercl2caloparticle_perlayer =
+    ibook.bookProfile2D("SharedEnergy_layercaloenergy_layercl2caloparticle_perlayer",
+                  "LayerCluster Purity vs CaloParticle Energy per layer per layer",
+                  2 * layers,
+                  0.,
+                  2 * layers,
+                  nintEneClperlay_,
+                  minEneClperlay_,
+                  maxEneClperlay_,
+                  minSharedEneFrac_,
+                  maxSharedEneFrac_);
+  histograms.h_sharedenergy_layercaloenergy_layercl2caloparticle_avg_perlayer =
+    ibook.bookProfile2D("SharedEnergy_layercaloenergy_layercl2caloparticle_avg_perlayer",
+                  "LayerCluster Purity vs CaloParticle Energy per layer per layer averaged over all clusters",
+                  2 * layers,
+                  0.,
+                  2 * layers,
+                  nintEneClperlay_,
+                  minEneClperlay_,
+                  maxEneClperlay_,
+                  minSharedEneFrac_,
+                  maxSharedEneFrac_);
+  
+  //---------------------------------------------------------------------------------------------------------------------------
+  for (auto const& score : VScoreCutCPtoLC_) {
+    std::string s = to_p_string(score);
+    histograms.h_nums_layercl_perlayer.push_back(ibook.book1D(
+        "Nums_LayerCluster_perlayer_cut_" + s, "Nums LayerCluster per Layer with cut " + s, layers * 2, 0, layers * 2));
+    histograms.h_num_caloparticle_perlayer.push_back(ibook.book1D(
+        "Num_CaloParticle_perlayer_cut_" + s, "Num CaloParticle per Layer with cut " + s, layers * 2, 0, layers * 2));
+    histograms.h_response_sim2reco_all.push_back(
+        ibook.book1D("Response_sim2reco_cut" + s, "Response with SimToReco with cut " + s, 100, 0.8, 1.6));
+    histograms.h_response_sim2reco_e.push_back(
+        ibook.book1D("Response_E_sim2reco_cut" + s, "Response for CE-E CP with SimToReco with cut " + s, 100, 0.8, 1.6));
+    histograms.h_response_sim2reco_h.push_back(
+        ibook.book1D("Response_H_sim2reco_cut" + s, "Response for CE-H CP with SimToReco with cut " + s, 100, 0.8, 1.6));
+  }
+  for (auto const& score : VScoreCutLCtoCP_) {
+    std::string s = to_p_string(score);
+    histograms.h_num_layercl_perlayer.push_back(ibook.book1D(
+        "Num_LayerCluster_perlayer_cut_" + s, "Num LayerCluster per Layer with cut " + s, layers * 2, 0, layers * 2));
+    histograms.h_response_reco2sim_all.push_back(
+        ibook.book1D("Response_reco2sim_cut" + s, "Response with RecoToSim with cut " + s, 100, 0.8, 1.6));
+    histograms.h_response_reco2sim_e.push_back(
+        ibook.book1D("Response_E_reco2sim_cut" + s, "Response for CE-E CP with RecoToSim with cut " + s, 100, 0.8, 1.6));
+    histograms.h_response_reco2sim_h.push_back(
+        ibook.book1D("Response_H_reco2sim_cut" + s, "Response for CE-H CP with RecoToSim with cut " + s, 100, 0.8, 1.6));
   }
   //---------------------------------------------------------------------------------------------------------------------------
+  histograms.h_caloparticle_energy_frac_bh = ibook.book1D(
+        "Energy_CaloParticle_Frac_BH", "Energy CaloParticle Fraction of BH ", 20, 0, 1);
+  histograms.h_caloparticle_energy_frac_ee = ibook.book1D(
+        "Energy_CaloParticle_Frac_EE", "Energy CaloParticle Fraction of EE ", 20, 0, 1);
 }
 
 void HGVHistoProducerAlgo::bookClusterHistos_CellLevel(DQMStore::IBooker& ibook,
@@ -1433,6 +1574,301 @@ void HGVHistoProducerAlgo::bookTracksterSTSHistos(DQMStore::IBooker& ibook,
                    minPt_,
                    maxPt_));
 }
+void HGVHistoProducerAlgo::bookResponseHistos(DQMStore::IBooker& ibook, Histograms& histograms) {
+  // Implementation for booking response histograms
+  response_booked_ = true;
+  histograms.h_response_simtrackstersFromCP2caloparticle = ibook.book2D("Response_simtrackstersFromCP2caloparticle",
+                                                        "Response of simtrackstersFromCP to caloparticle;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_trackstersCLUE3DHigh2caloparticle = ibook.book2D("Response_trackstersCLUE3DHigh2caloparticle",
+                                                        "Response of trackstersCLUE3DHigh to caloparticle;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_ticlcandidate2caloparticle = ibook.book2D("Response_ticlcandidate2caloparticle",
+                                                        "Response of ticlcandidate to caloparticle;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_layerClusters2caloparticle = ibook.book2D("Response_layerClusters2caloparticle",
+                                                        "Response of layerClusters to caloparticle;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_layerClusters2caloparticle_mask = ibook.book2D("Response_layerClusters2caloparticle_mask",
+                                                        "Response of layerClusters to caloparticle,masked;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_shared_trackstersCLUE3DHigh2caloparticle = ibook.book2D("Response_trackstersCLUE3DHigh2caloparticle_shared",
+                                                        "Response of trackstersCLUE3DHigh to caloparticle,shared;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_shared_ticlcandidate2caloparticle = ibook.book2D("Response_ticlcandidate2caloparticle_shared",
+                                                        "Response of ticlcandidate to caloparticle,shared;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_shared_layerClusters2caloparticle = ibook.book2D("Response_layerClusters2caloparticle_shared",
+                                                        "Response of layerClusters to caloparticle,shared;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_shared_layerClusters2caloparticle_mask = ibook.book2D("Response_layerClusters2caloparticle_shared_mask",
+                                                        "Response of layerClusters to caloparticle,shared,masked;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_reg_ticlcandidate2caloparticle = ibook.book2D("Response_ticlcandidate2caloparticle_regressed",
+                                                        "Response of ticlcandidate to caloparticle,regressed;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_trackstersCLUE3DHigh2caloparticle_sci = ibook.book2D("Response_trackstersCLUE3DHigh2caloparticle_sci",
+                                                        "Response of trackstersCLUE3DHigh to caloparticle,Scintillators;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_ticlcandidate2caloparticle_sci = ibook.book2D("Response_ticlcandidate2caloparticle_sci",
+                                                        "Response of ticlcandidate to caloparticle,Scintillators;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_layerClusters2caloparticle_sci = ibook.book2D("Response_layerClusters2caloparticle_sci",
+                                                        "Response of layerClusters to caloparticle,Scintillators;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_layerClusters2caloparticle_mask_sci = ibook.book2D("Response_layerClusters2caloparticle_mask_sci",
+                                                        "Response of layerClusters to caloparticle,masked,Scintillators;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_shared_trackstersCLUE3DHigh2caloparticle_sci = ibook.book2D("Response_trackstersCLUE3DHigh2caloparticle_shared_sci",
+                                                        "Response of trackstersCLUE3DHigh to caloparticle,shared,Scintillators;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_shared_ticlcandidate2caloparticle_sci = ibook.book2D("Response_ticlcandidate2caloparticle_shared_sci",
+                                                        "Response of ticlcandidate to caloparticle,shared,Scintillators;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_shared_layerClusters2caloparticle_sci = ibook.book2D("Response_layerClusters2caloparticle_shared_sci",
+                                                        "Response of layerClusters to caloparticle,shared,Scintillators;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_shared_layerClusters2caloparticle_mask_sci = ibook.book2D("Response_layerClusters2caloparticle_shared_mask_sci",
+                                                        "Response of layerClusters to caloparticle,shared,masked,Scintillators;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+  histograms.h_response_reg_ticlcandidate2caloparticle_sci = ibook.book2D("Response_ticlcandidate2caloparticle_regressed_sci",
+                                                        "Response of ticlcandidate to caloparticle,regressed,Scintillators;caloparticle energy [GeV];response",
+                                                        nintEne_,
+                                                        minEne_,
+                                                        maxEne_,
+                                                        150,
+                                                        0,
+                                                        1.5);
+}
+void HGVHistoProducerAlgo::fill_response_histos(
+    const Histograms& histograms,
+    const edm::ProductID& cPHandle_id,
+    std::vector<CaloParticle> const& cP,
+    std::vector<size_t> const& cPIndices,
+    std::vector<size_t> const& cPSelectedIndices,
+    const ticl::TracksterCollection& tracksters,
+    const ticl::TracksterCollection& simTracksters_fromCP,
+    const edm::Handle<std::vector<TICLCandidate>> ticlcandidatesHandle,
+    const SimClusterToCaloParticleMap& scToCpMap,
+    std::unordered_map<DetId, const unsigned int> const& hitMap,
+    unsigned int layers,
+    edm::Handle<std::vector<CaloParticle>> caloParticleHandle,
+    edm::MultiSpan<HGCRecHit> const& hits,
+    const edm::Handle<reco::GenParticleCollection> genParticleHandle,
+    const edm::Handle<TracksterToTracksterMap>& simTrackstersFromCPsToTrackstersByLCsMapH,
+    const edm::Handle<TracksterToTracksterMap>& ticlSimTrackstersfromCPsToticlCandidateH) const {
+  // Implementation for filling response histograms
+  // const auto firstId = simTrackstersFromCPsToTrackstersByLCsMapH->getCollectionIDs().first.id();
+  // const auto secondId = ticlSimTrackstersfromCPsToticlCandidateH->getCollectionIDs().second.id();
+  // const auto ticlcandidatesId = ticlcandidatesHandle.id();
+  // LogDebug("HGCalValidator") << "firstId: " << firstId << ", secondId: " << secondId << ", ticlcandidatesId: " << ticlcandidatesId << " consistent: " << (secondId == ticlcandidatesId) << std::endl;
+  auto TICLCandidates = *ticlcandidatesHandle;
+  const auto& simTrackstersFromCPsToTrackstersByLCsMap = *simTrackstersFromCPsToTrackstersByLCsMapH;
+  const auto& ticlSimTrackstersfromCPsToticlCandidate = *ticlSimTrackstersfromCPsToticlCandidateH;
+  auto getCPId = [](const ticl::Trackster& simTS,
+                    const edm::ProductID& cPHandle_id,
+                    const SimClusterToCaloParticleMap& scToCpMap) {
+    const auto productID = simTS.seedID();
+    if (productID == cPHandle_id) {
+      return simTS.seedIndex();
+    } else {
+      return int(scToCpMap.at(simTS.seedIndex()).index());
+    }
+  };
+  // for (auto const& genParticle : *genParticleHandle) {
+  //   LogDebug("HGCalValidator") << "Gen particle ID: " << genParticle.pdgId() << ", energy: " << genParticle.energy() << std::endl;
+  // }
+  for (const auto& cpId : cPSelectedIndices) {
+    const edm::Ref<CaloParticleCollection> cpRef(caloParticleHandle, cpId);
+    float cPEnergy = 0;
+    float cPEnergyInScintillator = 0;
+    // float cPEnergy_all = 0;
+    for (const auto& simCluster : cP[cpId].simClusters()) {
+      for (const auto& it_haf : simCluster->hits_and_fractions()) {
+        const DetId hitid = (it_haf.first);
+        if (recHitTools_->isBarrel(hitid))
+          continue;
+        std::unordered_map<DetId, const unsigned int>::const_iterator itcheck = hitMap.find(hitid);
+        if (itcheck != hitMap.end()) {
+          const HGCRecHit* hit = &(hits[itcheck->second]);
+          // LogDebug("HGCalValidator") << "fraction: " << it_haf.second << std::endl;
+          cPEnergy += it_haf.second * hit->energy();
+          if (recHitTools_->isScintillator(hitid))
+            cPEnergyInScintillator += it_haf.second * hit->energy();
+          // cPEnergy_all += hit->energy();
+          // cpHitsOnLayer[hitLayerId].push_back({hitid.rawId(), {it_haf.second, hit->energy()}});
+        }
+      }
+    }
+    auto nSimTracksters = simTracksters_fromCP.size();
+    for (unsigned int simTracksterIndex = 0; simTracksterIndex < nSimTracksters; ++simTracksterIndex) {
+      auto const& simTrackster = simTracksters_fromCP[simTracksterIndex];
+      if (cpId != (unsigned int)getCPId(simTrackster, cPHandle_id, scToCpMap))
+        continue;
+      // histograms.h_energy_simtrackstersFromCP2caloparticle->Fill(cPEnergy, simTrackster.regressed_energy());
+      histograms.h_response_simtrackstersFromCP2caloparticle->Fill(cPEnergy, simTrackster.raw_energy() / cPEnergy);
+      // LogDebug("HGCalValidator") << "Number of gen particles: " << cP[cpId].genParticles().size() << std::endl;
+      // for (const auto& genParticle : cP[cpId].genParticles()) {
+      //   LogDebug("HGCalValidator") << "Gen particle ID: " << genParticle->pdgId() << ", energy: " << genParticle->energy() << std::endl;
+      // }
+      // LogDebug("HGCalValidator") << "CP energy " << cP[cpId].energy() << " vs CP sim Energy " << cP[cpId].simEnergy() << " vs CP hits franction Energy " << cPEnergy << " vs ST regressed energy " << simTrackster.regressed_energy() << " vs ST raw Energy " << simTrackster.raw_energy() << std::endl;
+      float trackstersEnergy = 0, trackstersEnergy_shared = 0;
+      for (unsigned int i = 0; i < simTrackstersFromCPsToTrackstersByLCsMap[simTracksterIndex].size(); ++i) {
+        auto score = simTrackstersFromCPsToTrackstersByLCsMap[simTracksterIndex][i].score();
+        auto sharedEnergy = simTrackstersFromCPsToTrackstersByLCsMap[simTracksterIndex][i].sharedEnergy();
+        auto index = simTrackstersFromCPsToTrackstersByLCsMap[simTracksterIndex][i].index();
+        if (score < 1) {
+          auto const& b = tracksters[index];
+          // auto a = simTrackstersFromCPsToTrackstersByLCsMap.getRefSecond(index);
+
+          // LogDebug("HGCalValidator") << "test different ways to get the same trackster: " << a->raw_energy() << " vs " << b.raw_energy() << std::endl;
+          trackstersEnergy += b.raw_energy();
+          // trackstersEnergy_regressed += b.regressed_energy();
+          trackstersEnergy_shared += sharedEnergy;
+        }
+      }
+      histograms.h_response_trackstersCLUE3DHigh2caloparticle->Fill(cPEnergy, trackstersEnergy / cPEnergy);
+      histograms.h_response_shared_trackstersCLUE3DHigh2caloparticle->Fill(cPEnergy, trackstersEnergy_shared / cPEnergy);
+      if (cPEnergyInScintillator / cPEnergy > 0.7) {
+        histograms.h_response_trackstersCLUE3DHigh2caloparticle_sci->Fill(cPEnergy, trackstersEnergy / cPEnergy);
+        histograms.h_response_shared_trackstersCLUE3DHigh2caloparticle_sci->Fill(cPEnergy, trackstersEnergy_shared / cPEnergy);
+      }
+      const auto& ts_vec = ticlSimTrackstersfromCPsToticlCandidate[simTracksterIndex];
+      if (!ts_vec.empty()) {
+        auto min_elem =
+          std::min_element(ts_vec.begin(), ts_vec.end(), [](auto const& ts1_id_pair, auto const& ts2_id_pair) {
+            return ts1_id_pair.score() < ts2_id_pair.score();
+          });
+        auto cand_idx = min_elem->index();
+        auto candSharedEnergy = min_elem->sharedEnergy();
+        float candRawEnergy = -1, candEnergy = -1;
+        for (const auto& tc : TICLCandidates) {
+          if (tc.tracksters().empty())
+            continue;
+          auto a = tc.tracksters()[0];
+          auto b = ticlSimTrackstersfromCPsToticlCandidate.getRefSecond(cand_idx);
+          if (a.id() == b.id() && a.key() == b.key()) {
+            candRawEnergy = tc.rawEnergy();
+            candEnergy = tc.energy();
+            // LogDebug("HGCalValidator") << "test different ways to get the same ticl candidate regressed energy: " << a->regressed_energy() << " vs " << b->regressed_energy() << " vs " << tc.energy() << std::endl;
+            break;
+            // LogDebug("HGCalValidator") << "test different ways to get the same ticl candidate: " << a->raw_energy() << " vs " << b->raw_energy() << "vs" << tc.rawEnergy() << std::endl;
+          }
+        }
+        // if (candRawEnergy < min_elem->sharedEnergy()) {
+        //   for (const auto& ts : ts_vec) {
+        //     LogDebug("HGCalValidator") << "ticl candidate energy: " << TICLCandidates[ts.index()].energy() << ", "
+        //          << ticlSimTrackstersfromCPsToticlCandidate.getRefSecond(ts.index())->raw_energy()
+        //          << " vs raw energy: " << TICLCandidates[ts.index()].rawEnergy()
+        //          << ", shared energy: " << ts.sharedEnergy() << ", score: " << ts.score() << std::endl;
+        //   }
+        //   for (const auto& tc : TICLCandidates) {
+        //     LogDebug("HGCalValidator") << "ticl candidate energy: " << tc.energy() << " vs raw energy: " << tc.rawEnergy() << std::endl;
+        //   }
+        // }
+        // LogDebug("HGCalValidator") << "test different ways to get the same ticl candidate: " << candEnergy << " vs " << candRawEnergy << std::endl;
+        histograms.h_response_reg_ticlcandidate2caloparticle->Fill(cPEnergy, candEnergy / cPEnergy);
+        histograms.h_response_ticlcandidate2caloparticle->Fill(cPEnergy, candRawEnergy / cPEnergy);
+        histograms.h_response_shared_ticlcandidate2caloparticle->Fill(cPEnergy, candSharedEnergy / cPEnergy);
+        if (cPEnergyInScintillator / cPEnergy > 0.7) {
+          histograms.h_response_reg_ticlcandidate2caloparticle_sci->Fill(cPEnergy, candEnergy / cPEnergy);
+          histograms.h_response_ticlcandidate2caloparticle_sci->Fill(cPEnergy, candRawEnergy / cPEnergy);
+          histograms.h_response_shared_ticlcandidate2caloparticle_sci->Fill(cPEnergy, candSharedEnergy / cPEnergy);
+        }
+      }
+    }
+  }
+}
 
 void HGVHistoProducerAlgo::fill_info_histos(const Histograms& histograms, unsigned int layers) const {
   // Save some info straight from geometry to avoid mistakes from updates
@@ -1460,7 +1896,7 @@ void HGVHistoProducerAlgo::fill_caloparticle_histos(const Histograms& histograms
   }
   if (histograms.h_caloparticle_eta_Zorigin.count(pdgid)) {
     histograms.h_caloparticle_eta_Zorigin.at(pdgid)->Fill(
-        simVertices.at(caloParticle.g4Tracks()[0].vertIndex()).position().z(), eta);
+        eta, simVertices.at(caloParticle.g4Tracks()[0].vertIndex()).position().z());
   }
 
   if (histograms.h_caloparticle_energy.count(pdgid)) {
@@ -1767,7 +2203,13 @@ void HGVHistoProducerAlgo::layerClusters_to_CaloParticles(
 
   std::unordered_map<DetId, std::vector<HGVHistoProducerAlgo::detIdInfoInCluster>> detIdToCaloParticleId_Map;
   std::unordered_map<DetId, std::vector<HGVHistoProducerAlgo::detIdInfoInCluster>> detIdToLayerClusterId_Map;
-
+  std::unordered_map<int, std::vector<float>> vec_sum_lc_sim2reco_energy_perlayer;
+  std::unordered_map<int, std::vector<float>> vec_sum_lc_reco2sim_energy_perlayer;
+  std::vector<float> vec_sum_lc_sim2reco_energy(VScoreCutCPtoLC_.size(), 0.);
+  std::vector<float> vec_sum_lc_reco2sim_energy(VScoreCutLCtoCP_.size(), 0.);
+  // std::vector<float> lc_energy(2 * layers, 0);
+  // std::vector<float> lc_energy_in_CP(2 * layers, 0);
+  // float lc_tot_energy = 0., lc_tot_energy_in_CP = 0.;
   // The association has to be done in an all-vs-all fashion.
   // For this reason use the full set of CaloParticles, with the only filter on bx
   for (const auto& cpId : cPIndices) {
@@ -1869,14 +2311,13 @@ void HGVHistoProducerAlgo::layerClusters_to_CaloParticles(
   // Fill the plots to compute the different metrics linked to
   // reco-level, namely fake-rate an merge-rate. In this loop should *not*
   // restrict only to the selected caloParaticles.
+  // std::vector<int> lc_index;
   for (unsigned int lcId = 0; lcId < nLayerClusters; ++lcId) {
     const auto firstHitDetId = (clusters[lcId].hitsAndFractions())[0].first;
     if (recHitTools_->isBarrel(firstHitDetId))
       continue;
     const int lcLayerId =
         recHitTools_->getLayerWithOffset(firstHitDetId) + layers * ((recHitTools_->zside(firstHitDetId) + 1) >> 1) - 1;
-    histograms.h_denom_layercl_eta_perlayer.at(lcLayerId)->Fill(clusters[lcId].eta());
-    histograms.h_denom_layercl_phi_perlayer.at(lcLayerId)->Fill(clusters[lcId].phi());
     //
     const edm::Ref<reco::CaloClusterCollection> lcRef(clusterHandle, lcId);
     const auto& cpsIt = cpsInLayerClusterMap.find(lcRef);
@@ -1890,6 +2331,38 @@ void HGVHistoProducerAlgo::layerClusters_to_CaloParticles(
         histograms.h_score_layercl2caloparticle_perlayer.at(lcLayerId)->Fill(cpPair.second);
       continue;
     }
+    // for (auto const& rhPair : clusters[lcId].hitsAndFractions()) {
+    //   std::unordered_map<DetId, const unsigned int>::const_iterator itcheck = hitMap.find(rhPair.first);
+    //   const HGCRecHit* hit = &(hits[itcheck->second]);
+    //   if (rhPair.second < 1) {
+    //     LogDebug("HGCalValidator") << "LC: " << lcId << std::endl;
+    //     LogDebug("HGCalValidator") << "hitId: " << rhPair.first.rawId() << ", fraction: " << rhPair.second
+    //               << ", energy: " << hit->energy() << std::endl;
+    //   }
+    // }
+    // if (cps.empty())
+    //   continue;
+    bool relavant = false;
+    for (const auto& cpId : cPSelectedIndices) {
+      const edm::Ref<CaloParticleCollection> cpRef(caloParticleHandle, cpId);
+      const auto assoc =
+        std::any_of(std::begin(cps), std::end(cps), [&cpRef](const auto& p) {
+                         return p.first == cpRef;
+                       });
+      if (assoc) {
+        relavant = true;
+        break;
+      }
+    }
+    if (!relavant)
+      continue;
+    // lc_energy[lcLayerId] += lc_en;
+    // lc_tot_energy += clusters[lcId].energy();
+    // lc_index.push_back(lcId);
+    histograms.h_denom_layercl_eta_perlayer.at(lcLayerId)->Fill(clusters[lcId].eta());
+    histograms.h_denom_layercl_phi_perlayer.at(lcLayerId)->Fill(clusters[lcId].phi());
+    bool assoc_sim = false;
+    std::vector<bool> assocs_sim(VScoreCutCPtoLC_.size(), false);
     for (const auto& cpPair : cps) {
       LogDebug("HGCalValidator") << "layerCluster Id: \t" << lcId << "\t CP id: \t" << cpPair.first.index()
                                  << "\t score \t" << cpPair.second << std::endl;
@@ -1903,10 +2376,35 @@ void HGVHistoProducerAlgo::layerClusters_to_CaloParticles(
       if (cp_linked ==
           cPOnLayerMap[cpPair.first].end())  // This should never happen by construction of the association maps
         continue;
-      histograms.h_sharedenergy_layercl2caloparticle_perlayer.at(lcLayerId)->Fill(cp_linked->second.first / lc_en,
+      // lc_energy_in_CP[lcLayerId] += cp_linked->second.first;
+      // lc_tot_energy_in_CP += cp_linked->second.first;
+      histograms.h_sharedenergy_layercl2caloparticle_perlayer->Fill(lcLayerId, cp_linked->second.first / lc_en,
                                                                                   lc_en);
       histograms.h_energy_vs_score_layercl2caloparticle_perlayer.at(lcLayerId)->Fill(cpPair.second,
                                                                                      cp_linked->second.first / lc_en);
+      histograms.h_totalenergy_vs_score_layercl2caloparticle_perlayer.at(lcLayerId)->Fill(cpPair.second,
+                                                                                     lc_en);
+      histograms.h_sharedenergy_layercl2caloparticle_avg_perlayer->Fill(lcLayerId, cp_linked->second.first / lc_en);
+      if (cp_linked->second.second < ScoreCutCPtoLC_)
+        assoc_sim = true;
+      for (unsigned i = 0; i < VScoreCutCPtoLC_.size(); i++) {
+        if (cp_linked->second.second < VScoreCutCPtoLC_[i])
+          assocs_sim[i] = true;
+      }
+    }
+    if (assoc_sim) {
+      histograms.h_nums_layercl_eta_perlayer.at(lcLayerId)->Fill(clusters[lcId].eta());
+      histograms.h_nums_layercl_phi_perlayer.at(lcLayerId)->Fill(clusters[lcId].phi());
+    }
+    for (unsigned i = 0; i < VScoreCutCPtoLC_.size(); i++) {
+      if (assocs_sim[i])
+        histograms.h_nums_layercl_perlayer[i]->Fill(lcLayerId);
+    }
+    for (unsigned i = 0; i < VScoreCutLCtoCP_.size(); i++) {
+      auto const assocs =
+        std::any_of(std::begin(cps), std::end(cps), [this, i](const auto& obj) { return obj.second < VScoreCutLCtoCP_[i]; });
+      if (assocs)
+        histograms.h_num_layercl_perlayer[i]->Fill(lcLayerId);
     }
     const auto assoc =
         std::count_if(std::begin(cps), std::end(cps), [](const auto& obj) { return obj.second < ScoreCutLCtoCP_; });
@@ -1934,15 +2432,22 @@ void HGVHistoProducerAlgo::layerClusters_to_CaloParticles(
           clusters[lcId].phi(), best_cp_linked->second.first / lc_en);
     }
   }  // End of loop over LayerClusters
-
+  // auto lc_tot_energy = std::accumulate(lc_energy.begin(), lc_energy.end(), 0.);
+  // auto lc_tot_energy_in_CP = std::accumulate(lc_energy_in_CP.begin(), lc_energy_in_CP.end(), 0.);
   // Here Fill the plots to compute the different metrics linked to
   // gen-level, namely efficiency and duplicate. In this loop should restrict
   // only to the selected caloParaticles.
   for (const auto& cpId : cPSelectedIndices) {
     const edm::Ref<CaloParticleCollection> cpRef(caloParticleHandle, cpId);
     const auto& lcsIt = cPOnLayerMap.find(cpRef);
-
+    // std::vector<int> lc_index_per_CP;
+    float lc_tot_energy_perCP = 0., lc_tot_energy_in_CP_perCP = 0.;
+    float lc_tot_energy_perCP_mask = 0., lc_tot_energy_in_CP_perCP_mask = 0.;
+    std::vector<float> lc_energy_perCP(2 * layers, 0);
+    std::vector<float> lc_energy_in_CP_perCP(2 * layers, 0);
     std::map<unsigned int, float> cPEnergyOnLayer;
+    float cpEnergyInScintillator = 0.;
+    // std::map<unsigned int, std::vector<std::pair<uint32_t, std::pair<double, double>>>> cpHitsOnLayer;
     for (unsigned int layerId = 0; layerId < layers * 2; ++layerId)
       cPEnergyOnLayer[layerId] = 0;
 
@@ -1957,14 +2462,30 @@ void HGVHistoProducerAlgo::layerClusters_to_CaloParticles(
         if (itcheck != hitMap.end()) {
           const HGCRecHit* hit = &(hits[itcheck->second]);
           cPEnergyOnLayer[hitLayerId] += it_haf.second * hit->energy();
+          if (recHitTools_->isScintillator(hitid))
+            cpEnergyInScintillator += it_haf.second * hit->energy();
+          // cpHitsOnLayer[hitLayerId].push_back({hitid.rawId(), {it_haf.second, hit->energy()}});
         }
       }
     }
+    double e_tot = 0;
+    double e_ee = 0;
+    double e_bh = 0;
+    // std::vector<float> CP_energy(2 * layers, 0);
+    float CP_energy_tot = 0.;
 
     for (unsigned int layerId = 0; layerId < layers * 2; ++layerId) {
+      // CP_energy[layerId] += cPEnergyOnLayer[layerId];
+      CP_energy_tot += cPEnergyOnLayer[layerId];
       if (!cPEnergyOnLayer[layerId])
         continue;
-
+      if (layerId >= layers) {
+        e_tot += cPEnergyOnLayer[layerId];
+        if (layerId < layers + 26)
+          e_ee += cPEnergyOnLayer[layerId];
+        if (layerId >= layers + 33)
+          e_bh += cPEnergyOnLayer[layerId];
+      }
       histograms.h_denom_caloparticle_eta_perlayer.at(layerId)->Fill(cP[cpId].g4Tracks()[0].momentum().eta());
       histograms.h_denom_caloparticle_phi_perlayer.at(layerId)->Fill(cP[cpId].g4Tracks()[0].momentum().phi());
 
@@ -1980,17 +2501,82 @@ void HGVHistoProducerAlgo::layerClusters_to_CaloParticles(
                                layers * ((recHitTools_->zside(firstHitDetId) + 1) >> 1) - 1;
         return lcLayerId;
       };
-
+      vec_sum_lc_sim2reco_energy_perlayer[layerId].assign(VScoreCutCPtoLC_.size(), 0.);
+      vec_sum_lc_reco2sim_energy_perlayer[layerId].assign(VScoreCutLCtoCP_.size(), 0.);
+      // bool print_cp = true;
       for (const auto& lcPair : lcs) {
         if (recHitTools_->isBarrel(clusters[lcPair.first.index()].seed()))
           continue;
         if (getLCLayerId(lcPair.first.index()) != layerId)
           continue;
+        // lc_index_per_CP.push_back(lcPair.first.index());
+        lc_tot_energy_perCP += clusters[lcPair.first.index()].energy();
+        lc_tot_energy_in_CP_perCP += lcPair.second.first;
+        lc_energy_perCP[layerId] += clusters[lcPair.first.index()].energy();
+        lc_energy_in_CP_perCP[layerId] += lcPair.second.first;
+        if (clusters[lcPair.first.index()].size() >= 2 || !recHitTools_->isSilicon(clusters[lcPair.first.index()].hitsAndFractions()[0].first)) {
+          lc_tot_energy_perCP_mask += clusters[lcPair.first.index()].energy();
+          lc_tot_energy_in_CP_perCP_mask += lcPair.second.first;
+        }
         histograms.h_score_caloparticle2layercl_perlayer.at(layerId)->Fill(lcPair.second.second);
         histograms.h_sharedenergy_caloparticle2layercl_perlayer.at(layerId)->Fill(
             lcPair.second.first / cPEnergyOnLayer[layerId], cPEnergyOnLayer[layerId]);
         histograms.h_energy_vs_score_caloparticle2layercl_perlayer.at(layerId)->Fill(
             lcPair.second.second, lcPair.second.first / cPEnergyOnLayer[layerId]);
+        for (unsigned i = 0; i < VScoreCutCPtoLC_.size(); i++) {
+          if (lcPair.second.second < VScoreCutCPtoLC_[i]) {
+            vec_sum_lc_sim2reco_energy_perlayer[layerId][i] += clusters[lcPair.first.index()].energy(); // lcPair.second.first;
+            if (layerId >= layers)
+              vec_sum_lc_sim2reco_energy[i] += clusters[lcPair.first.index()].energy();
+          }
+        }
+        auto const& lc_linked = std::find_if(
+            std::begin(cpsInLayerClusterMap[lcPair.first]),
+            std::end(cpsInLayerClusterMap[lcPair.first]),
+            [&cpRef](const std::pair<edm::Ref<CaloParticleCollection>, float>& p) { return p.first == cpRef; });
+        if (lc_linked == cpsInLayerClusterMap[lcPair.first].end())  // This should never happen by construction of the association maps
+          continue;
+        
+        for (unsigned i = 0; i < VScoreCutLCtoCP_.size(); i++) {
+          if (lc_linked->second < VScoreCutLCtoCP_[i]) {
+            vec_sum_lc_reco2sim_energy_perlayer[layerId][i] += clusters[lcPair.first.index()].energy(); // lcPair.second.first;
+            if (layerId >= layers)
+              vec_sum_lc_reco2sim_energy[i] += clusters[lcPair.first.index()].energy(); // lcPair.second.first;
+          }
+        }
+        // if (lcPair.second.second >= 1) {
+        //   if (print_cp) {
+        //     print_cp = false;
+        //     LogDebug("HGCalValidator") << "\nCP: " << cpId << std::endl;
+        //     for (auto const& rhPair : cpHitsOnLayer[layerId])
+        //       LogDebug("HGCalValidator") << "hitId: " << rhPair.first << ", fraction: " << rhPair.second.first
+        //                 << ", energy: " << rhPair.second.second << std::endl;
+        //   }
+        //   LogDebug("HGCalValidator") << "LC: " << lcPair.first.index() << std::endl;
+        //   LogDebug("HGCalValidator") << "At layer" << layerId << ", shared energy: " << lcPair.second.first << ", S2R: " << lcPair.second.second << ", R2S: " << lc_linked->second << std::endl;
+        //   LogDebug("HGCalValidator") << "hits in LC: " << std::endl;
+        //   for (auto const& rhPair: clusters[lcPair.first.index()].hitsAndFractions()) {
+        //     std::unordered_map<DetId, const unsigned int>::const_iterator itcheck = hitMap.find(rhPair.first);
+        //     const HGCRecHit* hit = &(hits[itcheck->second]);
+        //     LogDebug("HGCalValidator") << "hitId: " << rhPair.first.rawId() << ", fraction: " << rhPair.second << ", energy: " << hit->energy() << std::endl;
+        //   }
+        // }
+      }
+
+      for (unsigned i = 0; i < VScoreCutCPtoLC_.size(); i++)
+        histograms.h_response_sim2reco_perlayer.at(layerId)[i]->Fill(vec_sum_lc_sim2reco_energy_perlayer[layerId][i] / cPEnergyOnLayer[layerId]);
+      for (unsigned i = 0; i < VScoreCutLCtoCP_.size(); i++)
+        histograms.h_response_reco2sim_perlayer.at(layerId)[i]->Fill(vec_sum_lc_reco2sim_energy_perlayer[layerId][i] / cPEnergyOnLayer[layerId]);
+
+      for (unsigned i = 0; i < VScoreCutCPtoLC_.size(); i++) {
+        const auto assocs = std::any_of(std::begin(lcs), std::end(lcs), [&](const auto& obj) {
+          if (getLCLayerId(obj.first.index()) != layerId)
+            return false;
+          else
+            return obj.second.second < VScoreCutCPtoLC_[i];
+        });
+        if (assocs)
+          histograms.h_num_caloparticle_perlayer[i]->Fill(layerId);
       }
       const auto assoc = std::count_if(std::begin(lcs), std::end(lcs), [&](const auto& obj) {
         if (getLCLayerId(obj.first.index()) != layerId)
@@ -2019,7 +2605,74 @@ void HGVHistoProducerAlgo::layerClusters_to_CaloParticles(
             cP[cpId].g4Tracks()[0].momentum().phi(), best->second.first / cPEnergyOnLayer[layerId]);
       }
     }
+    histograms.h_caloparticle_energy_frac_ee->Fill(e_ee / e_tot);
+    histograms.h_caloparticle_energy_frac_bh->Fill(e_bh / e_tot);
+    for (unsigned i = 0; i < VScoreCutCPtoLC_.size(); i++) {
+      histograms.h_response_sim2reco_all[i]->Fill(vec_sum_lc_sim2reco_energy[i] / e_tot);
+      if (e_ee / e_tot >= 0.9)
+        histograms.h_response_sim2reco_e[i]->Fill(vec_sum_lc_sim2reco_energy[i] / e_tot);
+      if (e_ee / e_tot < 0.1)
+        histograms.h_response_sim2reco_h[i]->Fill(vec_sum_lc_sim2reco_energy[i] / e_tot);
+    }
+    for (unsigned i = 0; i < VScoreCutLCtoCP_.size(); i++) {
+      histograms.h_response_reco2sim_all[i]->Fill(vec_sum_lc_reco2sim_energy[i] / e_tot);
+      if (e_ee / e_tot >= 0.9)
+        histograms.h_response_reco2sim_e[i]->Fill(vec_sum_lc_reco2sim_energy[i] / e_tot);
+      if (e_ee / e_tot < 0.1)
+        histograms.h_response_reco2sim_h[i]->Fill(vec_sum_lc_reco2sim_energy[i] / e_tot);
+    }
+    // if (e_bh / e_tot > 0.5) {
+    //   LogDebug("HGCalValidator") << "with " << e_bh / e_tot << " energy in BH: event: " << cP[cpId].eventId().event() << "\n" << std::flush;
+    // }
+    if (response_booked_) {
+      histograms.h_response_shared_layerClusters2caloparticle->Fill(CP_energy_tot, lc_tot_energy_in_CP_perCP / CP_energy_tot);
+      histograms.h_response_layerClusters2caloparticle->Fill(CP_energy_tot, lc_tot_energy_perCP / CP_energy_tot);
+      histograms.h_response_shared_layerClusters2caloparticle_mask->Fill(CP_energy_tot, lc_tot_energy_in_CP_perCP_mask / CP_energy_tot);
+      histograms.h_response_layerClusters2caloparticle_mask->Fill(CP_energy_tot, lc_tot_energy_perCP_mask / CP_energy_tot);
+      if (cpEnergyInScintillator / CP_energy_tot > 0.7) {
+        histograms.h_response_shared_layerClusters2caloparticle_sci->Fill(CP_energy_tot, lc_tot_energy_in_CP_perCP / CP_energy_tot);
+        histograms.h_response_layerClusters2caloparticle_sci->Fill(CP_energy_tot, lc_tot_energy_perCP / CP_energy_tot);
+        histograms.h_response_shared_layerClusters2caloparticle_mask_sci->Fill(CP_energy_tot, lc_tot_energy_in_CP_perCP_mask / CP_energy_tot);
+        histograms.h_response_layerClusters2caloparticle_mask_sci->Fill(CP_energy_tot, lc_tot_energy_perCP_mask / CP_energy_tot);
+      }
+    }
+    for (unsigned int layerId = 0; layerId < layers * 2; ++layerId) {
+      if (lc_energy_perCP[layerId] == 0)
+        continue;
+      histograms.h_sharedenergy_caloenergy_layercl2caloparticle_perlayer->Fill(
+          layerId, CP_energy_tot, lc_energy_in_CP_perCP[layerId] / lc_energy_perCP[layerId], lc_energy_perCP[layerId]);
+      histograms.h_sharedenergy_caloenergy_layercl2caloparticle_avg_perlayer->Fill(
+          layerId, CP_energy_tot, lc_energy_in_CP_perCP[layerId] / lc_energy_perCP[layerId]);
+      histograms.h_sharedenergy_layercaloenergy_layercl2caloparticle_perlayer->Fill(
+          layerId, cPEnergyOnLayer[layerId], lc_energy_in_CP_perCP[layerId] / lc_energy_perCP[layerId], lc_energy_perCP[layerId]);
+      histograms.h_sharedenergy_layercaloenergy_layercl2caloparticle_avg_perlayer->Fill(
+          layerId, cPEnergyOnLayer[layerId], lc_energy_in_CP_perCP[layerId] / lc_energy_perCP[layerId]);
+    }
+    // if (lc_tot_energy_perCP != lc_tot_energy_perCP_mask || lc_tot_energy_in_CP_perCP != lc_tot_energy_in_CP_perCP_mask) {
+    //   LogDebug("HGCalValidator") << "number of relevant layer clusters: " << lc_index.size() << " vs " << lc_index_per_CP.size() << std::endl;
+    //   std::sort(lc_index.begin(), lc_index.end());
+    //   std::sort(lc_index_per_CP.begin(), lc_index_per_CP.end());
+    //   LogDebug("HGCalValidator") << "is index same? " << (lc_index == lc_index_per_CP) << std::endl;
+    //   LogDebug("HGCalValidator") << setprecision(10) << std::fixed;
+    //   LogDebug("HGCalValidator") << "different LC total energy: " << lc_tot_energy_perCP << " vs " << lc_tot_energy << std::endl;
+    //   LogDebug("HGCalValidator") << "different LC total energy in CP: " << lc_tot_energy_in_CP_perCP << " vs " << lc_tot_energy_in_CP << std::endl;
+    // }
   }
+  //  << "CP energy from layerclusters: " << CP_energy_tot << std::endl;
+  // if (response_booked_) {
+  //   histograms.h_response_shared_layerClusters2caloparticle->Fill(CP_energy_tot, lc_tot_energy_in_CP / CP_energy_tot);
+  //   histograms.h_response_layerClusters2caloparticle->Fill(CP_energy_tot, lc_tot_energy / CP_energy_tot);
+  // }
+  // LogDebug("HGCalValidator") << "Total energy in layerclusters: " << lc_tot_energy << std::endl;
+  // LogDebug("HGCalValidator") << "Total energy in layerclusters associated to CP: " << lc_tot_energy_in_CP << std::endl;
+  // for (unsigned int layerId = 0; layerId < layers * 2; ++layerId) {
+  //   if (lc_energy[layerId] == 0)
+  //     continue;
+  //   histograms.h_sharedenergy_caloenergy_layercl2caloparticle_perlayer->Fill(layerId, CP_energy_tot, lc_energy_in_CP[layerId]/lc_energy[layerId], lc_energy[layerId]);
+  //   histograms.h_sharedenergy_caloenergy_layercl2caloparticle_avg_perlayer->Fill(layerId, CP_energy_tot, lc_energy_in_CP[layerId]/lc_energy[layerId]);
+  //   histograms.h_sharedenergy_layercaloenergy_layercl2caloparticle_perlayer->Fill(layerId, CP_energy[layerId], lc_energy_in_CP[layerId]/lc_energy[layerId], lc_energy[layerId]);
+  //   histograms.h_sharedenergy_layercaloenergy_layercl2caloparticle_avg_perlayer->Fill(layerId, CP_energy[layerId], lc_energy_in_CP[layerId]/lc_energy[layerId]);
+  // }
 }
 
 void HGVHistoProducerAlgo::layerClusters_to_SimClusters(
@@ -2986,4 +3639,19 @@ double HGVHistoProducerAlgo::getEta(double eta) const {
     return fabs(eta);
   else
     return eta;
+}
+std::string HGVHistoProducerAlgo::to_p_string(double x) const {
+  if (x == static_cast<int>(x)) {
+    return std::to_string(static_cast<int>(x));
+  }
+  std::string s = std::to_string(x);
+  size_t pos = s.find('.');
+  if (pos != std::string::npos) {
+    s[pos] = 'p';
+  }
+  while (!s.empty() && s.back() == '0')
+    s.pop_back();
+  if (!s.empty() && s.back() == 'p')
+    s.pop_back();
+  return s;
 }

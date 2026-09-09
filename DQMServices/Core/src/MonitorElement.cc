@@ -334,9 +334,9 @@ namespace dqm::impl {
     else if (kind() == Kind::TH2Poly)
       static_cast<TH2Poly *>(accessRootObject(access, __PRETTY_FUNCTION__, 2))->Fill(x, y, zw);
     else if (kind() == Kind::TH3F)
-      static_cast<TH3F *>(accessRootObject(access, __PRETTY_FUNCTION__, 2))->Fill(x, y, zw, 1);
+      static_cast<TH3F *>(accessRootObject(access, __PRETTY_FUNCTION__, 3))->Fill(x, y, zw, 1);
     else if (kind() == Kind::TPROFILE)
-      static_cast<TProfile *>(accessRootObject(access, __PRETTY_FUNCTION__, 2))->Fill(x, y, zw);
+      static_cast<TProfile *>(accessRootObject(access, __PRETTY_FUNCTION__, 1))->Fill(x, y, zw);
     else if (kind() == Kind::TPROFILE2D)
       static_cast<TProfile2D *>(accessRootObject(access, __PRETTY_FUNCTION__, 2))->Fill(x, y, zw, 1);
     else
@@ -348,7 +348,7 @@ namespace dqm::impl {
     auto access = this->accessMut();
     update();
     if (kind() == Kind::TH3F)
-      static_cast<TH3F *>(accessRootObject(access, __PRETTY_FUNCTION__, 2))->Fill(x, y, z, w);
+      static_cast<TH3F *>(accessRootObject(access, __PRETTY_FUNCTION__, 3))->Fill(x, y, z, w);
     else if (kind() == Kind::TPROFILE2D)
       static_cast<TProfile2D *>(accessRootObject(access, __PRETTY_FUNCTION__, 2))->Fill(x, y, z, w);
     else

@@ -57,6 +57,7 @@ public:
         thresholdW0_(ps.getParameter<std::vector<double>>("thresholdW0")),
         positionDeltaRho2_(ps.getParameter<double>("positionDeltaRho2")),
         use2x2_(ps.getParameter<bool>("use2x2")),
+        gausKer_(ps.getParameter<std::vector<double>>("gausKer")),
         initialized_(false) {
 #if DEBUG_CLUSTERS_ALPAKA
     moduleType_ = ps.getParameter<std::string>("type");
@@ -142,6 +143,7 @@ public:
     descNestedNoiseMIP.add<double>("noise_MIP", 1. / 100.);
     iDesc.add<edm::ParameterSetDescription>("noiseMip", descNestedNoiseMIP);
     iDesc.add<bool>("use2x2", true);  // use 2x2 or 3x3 scenario for scint density calculation
+    iDesc.add<std::vector<double>>("gausKer", {-1., -1.});
   }
 
   /// point in the space
@@ -178,6 +180,7 @@ private:
   double positionDeltaRho2_;
 
   bool use2x2_;
+  std::vector<double> gausKer_;
 
   // initialization bool
   bool initialized_;

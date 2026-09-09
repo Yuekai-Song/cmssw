@@ -2,6 +2,9 @@
 
 #include "Validation/HGCalValidation/interface/HGCalValidator.h"
 
+#include "DataFormats/HGCalReco/interface/Trackster.h"
+#include "DataFormats/HepMCCandidate/interface/GenParticleFwd.h"
+#include "FWCore/Utilities/interface/InputTag.h"
 #include "SimCalorimetry/HGCalAssociatorProducers/interface/AssociatorTools.h"
 
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -95,6 +98,7 @@ HGCalValidator::HGCalValidator(const edm::ParameterSet& pset)
       label_clustersmask(pset.getParameter<std::vector<edm::InputTag>>("LayerClustersInputMask")),
       doCandidatesPlots_(pset.getUntrackedParameter<bool>("doCandidatesPlots")),
       label_candidates_(pset.getParameter<std::string>("ticlCandidates")),
+      doResponsePlots_(pset.getUntrackedParameter<bool>("doResponsePlots")),
       cummatbudinxo_(pset.getParameter<edm::FileInPath>("cummatbudinxo")),
       hitsToken_(consumes<edm::RefProdVector<HGCRecHitCollection>>(pset.getParameter<edm::InputTag>("hits"))),
       scToCpMapToken_(
@@ -106,6 +110,7 @@ HGCalValidator::HGCalValidator(const edm::ParameterSet& pset)
 
   label_cp_effic = consumes<std::vector<CaloParticle>>(label_cp_effic_tag);
   label_cp_fake = consumes<std::vector<CaloParticle>>(label_cp_fake_tag);
+  genParticles_ = consumes<reco::GenParticleCollection>(pset.getParameter<edm::InputTag>("genParticles"));
 
   simVertices_ = consumes<std::vector<SimVertex>>(pset.getParameter<edm::InputTag>("simVertices"));
 
@@ -132,7 +137,7 @@ HGCalValidator::HGCalValidator(const edm::ParameterSet& pset)
   }
 
   if (doCandidatesPlots_) {
-    edm::EDGetTokenT<std::vector<TICLCandidate>> TICLCandidatesToken =
+    TICLCandidatesToken_ =
         consumes<std::vector<TICLCandidate>>(pset.getParameter<edm::InputTag>("ticlTrackstersMerge"));
     edm::EDGetTokenT<std::vector<TICLCandidate>> simTICLCandidatesToken =
         consumes<std::vector<TICLCandidate>>(pset.getParameter<edm::InputTag>("simTiclCandidates"));
@@ -142,15 +147,15 @@ HGCalValidator::HGCalValidator(const edm::ParameterSet& pset)
         consumes<std::vector<ticl::Trackster>>(pset.getParameter<edm::InputTag>("ticlTrackstersMerge"));
     edm::EDGetTokenT<ticl::TracksterToTracksterMap> associatorMapRtSToken =
         consumes<ticl::TracksterToTracksterMap>(pset.getParameter<edm::InputTag>("mergeRecoToSimAssociator"));
-    edm::EDGetTokenT<ticl::TracksterToTracksterMap> associatorMapStRToken =
+    associatorMapStRToken_ =
         consumes<ticl::TracksterToTracksterMap>(pset.getParameter<edm::InputTag>("mergeSimToRecoAssociator"));
 
-    candidateVal_ = std::make_unique<TICLCandidateValidator>(TICLCandidatesToken,
+    candidateVal_ = std::make_unique<TICLCandidateValidator>(TICLCandidatesToken_,
                                                              simTICLCandidatesToken,
                                                              recoTracksToken,
                                                              trackstersToken,
                                                              associatorMapRtSToken,
-                                                             associatorMapStRToken);
+                                                             associatorMapStRToken_);
   }
 
   for (auto& itag : label_tst) {
@@ -330,6 +335,11 @@ void HGCalValidator::bookHistograms(DQMStore::IBooker& ibook,
     ibook.cd();
     ibook.setCurrentFolder(dirName_ + label_candidates_);
     candidateVal_->bookCandidatesHistos(ibook, histograms.histoTICLCandidates, dirName_ + label_candidates_);
+  }
+  if (doResponsePlots_) {
+    ibook.cd();
+    ibook.setCurrentFolder(dirName_ + "Response");
+    histoProducerAlgo_->bookResponseHistos(ibook, histograms.histoProducerAlgo);
   }
 }
 
@@ -635,6 +645,18 @@ void HGCalValidator::dqmAnalyze(const edm::Event& event,
                                                 trackstersToSimTrackstersFromCPsByHitsMapH,
                                                 simTrackstersFromCPsToTrackstersByHitsMapH,
                                                 scToCpMap);
+      if (doResponsePlots_ && doCandidatesPlots_ && label_tst[wml].label() == "ticlTrackstersCLUE3DHigh") {
+        auto TICLCandidatesHandle = event.getHandle(TICLCandidatesToken_);
+        if (!TICLCandidatesHandle.isValid()) {
+          edm::LogError("TICLCandidatesError") << "Failed to retrieve TICL candidates.";
+          return;  // Handle error appropriately
+        }
+        edm::Handle<ticl::TracksterToTracksterMap> ticlSimTrackstersfromCPsToticlCandidateH;
+        event.getByToken(associatorMapStRToken_, ticlSimTrackstersfromCPsToticlCandidateH);
+        edm::Handle<reco::GenParticleCollection> genParticleHandle;
+        event.getByToken(genParticles_, genParticleHandle);
+        histoProducerAlgo_->fill_response_histos(histograms.histoProducerAlgo, caloParticleHandle.id(), caloParticles, cPIndices, selected_cPeff, tracksters, simTrackstersFromCPs, TICLCandidatesHandle, scToCpMap, hitMap, totallayers_to_monitor_, caloParticleHandle, hits, genParticleHandle, simTrackstersFromCPsToTrackstersMapH, ticlSimTrackstersfromCPsToticlCandidateH);
+      }
     }
   }  //end of loop over Trackster input labels
 
@@ -715,6 +737,9 @@ void HGCalValidator::fillDescriptions(edm::ConfigurationDescriptions& descriptio
     psd1.add<double>("minEneClperlay", 0.0);
     psd1.add<double>("maxEneClperlay", 110.0);
     psd1.add<int>("nintEneClperlay", 110);
+    psd1.add<double>("minSingleEneClperlay", 0.0);
+    psd1.add<double>("maxSingleEneClperlay", 100.0);
+    psd1.add<int>("nintSingleEneClperlay", 200);
     psd1.add<double>("minScore", 0.0);
     psd1.add<double>("maxScore", 1.02);
     psd1.add<int>("nintScore", 51);
@@ -783,6 +808,8 @@ void HGCalValidator::fillDescriptions(edm::ConfigurationDescriptions& descriptio
     psd1.add<double>("minZ", -550.0);
     psd1.add<double>("maxZ", 550.0);
     psd1.add<int>("nintZ", 1100);
+    psd1.add<vector<double>>("VScoreCutLCtoCP", {0.1});
+    psd1.add<vector<double>>("VScoreCutCPtoLC", {0.1});
     desc.add<edm::ParameterSetDescription>("histoProducerAlgoBlock", psd1);
   }
   desc.add<edm::InputTag>("hits", edm::InputTag("recHitMapProducer", "RefProdVectorHGCRecHitCollection"));
@@ -861,6 +888,7 @@ void HGCalValidator::fillDescriptions(edm::ConfigurationDescriptions& descriptio
   desc.add<std::string>("ticlCandidates", "ticlCandidates");
   desc.add<edm::InputTag>("ticlTrackstersMerge", edm::InputTag("ticlCandidate"));
   desc.add<edm::InputTag>("simTiclCandidates", edm::InputTag("ticlSimTracksters"));
+  desc.addUntracked<bool>("doResponsePlots", true);
   desc.add<edm::InputTag>("recoTracks", edm::InputTag("generalTracks"));
   desc.add<edm::InputTag>(
       "mergeRecoToSimAssociator",
@@ -893,5 +921,6 @@ void HGCalValidator::fillDescriptions(edm::ConfigurationDescriptions& descriptio
   desc.add<std::string>("cutTk",
                         "1.48 < abs(eta) < 3.0 && pt > 1. && quality(\"highPurity\") && "
                         "hitPattern().numberOfLostHits(\"MISSING_OUTER_HITS\") < 5");
+  desc.add<edm::InputTag>("genParticles", edm::InputTag("genParticles"));
   descriptions.add("hgcalValidator", desc);
 }
